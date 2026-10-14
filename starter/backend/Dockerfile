@@ -1,5 +1,7 @@
 FROM python:3.10-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 ENV FLASK_RUN_HOST=0.0.0.0
 
 WORKDIR /app
@@ -19,5 +21,4 @@ RUN pipenv install --system --deploy --ignore-pipfile
 
 COPY . .
 
-CMD ["uwsgi", "--http", ":5000", "--master", "--enable-threads", \
-     "-s", "/tmp/app.sock", "--manage-script-name", "--mount", "/=app:app"]
+CMD ["uwsgi", "--http", ":5000", "--master", "--enable-threads", "-s", "/tmp/app.sock", "--manage-script-name", "--mount", "/=app:app"]
