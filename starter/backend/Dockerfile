@@ -9,7 +9,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     python3-dev \
-    libpcre3-dev \
+    libpcre2-dev \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
