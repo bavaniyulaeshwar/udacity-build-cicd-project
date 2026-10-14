@@ -1,4 +1,3 @@
-
 name: Frontend Continuous Deployment
 
 on:
@@ -11,7 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  lint:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -32,9 +31,13 @@ jobs:
         working-directory: starter/frontend
         run: npm run lint
 
+      - name: Run tests
+        working-directory: starter/frontend
+        run: npm run test -- --watchAll=false
+
   build-and-deploy:
     runs-on: ubuntu-latest
-    needs: lint
+    needs: test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -50,22 +53,30 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Build Docker image
         working-directory: starter/frontend
         env:
           REACT_APP_MOVIE_API_URL: ${{ secrets.REACT_APP_MOVIE_API_URL }}
         run: |
           docker build \
-            --build-arg REACT_APP_MOVIE_API_URL=$REACT_APP_MOVIE_API_URL \
-            -t ${{ secrets.AWS_ECR_FRONTEND_REPOSITORY }}:${{ github.sha }} .
+            --build-arg REACT_APP_MOVIE_API_URL="$REACT_APP_MOVIE_API_URL" \
+            -t ${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_FRONTEND_REPOSITORY }}:${{ github.sha }} .
 
       - name: Push Docker image
         run: |
-          docker tag ${{ secrets.AWS_ECR_FRONTEND_REPOSITORY }}:${{ github.sha }} \
-            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_FRONTEND_REPOSITORY }}:${{ github.sha }}
           docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_FRONTEND_REPOSITORY }}:${{ github.sha }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name "${{ secrets.AWS_EKS_CLUSTER_NAME }}" \
+            --region "${{ secrets.AWS_REGION }}"
+
+      - name: Deploy frontend to EKS
+        run: |
+          kubectl set image deployment/frontend \
+            frontend=${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_FRONTEND_REPOSITORY }}:${{ github.sha }}
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/frontend --timeout=180s
