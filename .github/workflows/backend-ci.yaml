@@ -1,4 +1,4 @@
-```yaml
+
 name: Backend Continuous Integration
 
 on:
@@ -70,4 +70,3 @@ jobs:
         run: |
           docker build \
             --tag mp-backend:${{ github.sha }} .
-```
